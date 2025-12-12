@@ -119,8 +119,18 @@ const QiblaScreen = () => {
     return `${Math.round(distance).toLocaleString()} km`;
   };
 
-  // Calculate rotation for the compass needle
-  const compassRotation = (qiblaDirection - magnetometerHeading + 360) % 360;
+  // Calculate rotation for the compass
+  // The compass and Qibla indicator rotate opposite to phone heading
+  // When user faces north (0°), magnetometerHeading = 0
+  // The compass should show N at top
+  const compassRotation = -magnetometerHeading;
+
+  // Qibla arrow rotates to point towards Mecca
+  // It's the Qibla direction minus the current heading
+  const qiblaRotation = qiblaDirection - magnetometerHeading;
+
+  // Check if pointing towards Qibla (within 10 degrees)
+  const isPointingQibla = Math.abs(qiblaRotation) < 10 || Math.abs(qiblaRotation) > 350;
 
   if (isLoading) {
     return (
@@ -163,49 +173,60 @@ const QiblaScreen = () => {
       </View>
 
       <View style={styles.compassContainer}>
+        {/* Fixed reference marker at top */}
+        <View style={styles.topMarker}>
+          <Ionicons name="caret-down" size={32} color="#1a936f" />
+        </View>
+
         <View style={styles.compass}>
-          {/* Compass background */}
-          <View style={styles.compassCircle}>
-            <Text style={[styles.compassMark, styles.northMark]}>N</Text>
-            <Text style={[styles.compassMark, styles.eastMark]}>E</Text>
-            <Text style={[styles.compassMark, styles.southMark]}>S</Text>
-            <Text style={[styles.compassMark, styles.westMark]}>O</Text>
-
-            {/* Qibla needle */}
-            <View
-              style={[
-                styles.needle,
-                {
-                  transform: [{ rotate: `${compassRotation}deg` }],
-                },
-              ]}
-            >
-              <View style={styles.needleTop} />
-              <View style={styles.needleBottom} />
-            </View>
-
-            {/* Center dot */}
-            <View style={styles.centerDot} />
-          </View>
-
-          {/* Kaaba icon */}
+          {/* Rotating compass background with cardinal directions */}
           <View
             style={[
-              styles.kaabaIcon,
+              styles.compassCircle,
               {
                 transform: [{ rotate: `${compassRotation}deg` }],
               },
             ]}
           >
-            <View style={styles.kaaba}>
-              <View style={styles.kaabaTop} />
-              <View style={styles.kaabaBody} />
+            <Text style={[styles.compassMark, styles.northMark]}>N</Text>
+            <Text style={[styles.compassMark, styles.eastMark]}>E</Text>
+            <Text style={[styles.compassMark, styles.southMark]}>S</Text>
+            <Text style={[styles.compassMark, styles.westMark]}>O</Text>
+
+            {/* Qibla arrow - rotates to point to Mecca */}
+            <View
+              style={[
+                styles.qiblaArrow,
+                {
+                  transform: [{ rotate: `${qiblaRotation}deg` }],
+                },
+              ]}
+            >
+              <Ionicons name="arrow-up" size={80} color="#1a936f" />
             </View>
+
+            {/* Kaaba icon on the Qibla arrow */}
+            <View
+              style={[
+                styles.kaabaIcon,
+                {
+                  transform: [{ rotate: `${qiblaRotation}deg` }],
+                },
+              ]}
+            >
+              <View style={styles.kaaba}>
+                <View style={styles.kaabaTop} />
+                <View style={styles.kaabaBody} />
+              </View>
+            </View>
+
+            {/* Center dot */}
+            <View style={styles.centerDot} />
           </View>
         </View>
 
         <Text style={styles.instruction}>
-          Alignez la flèche verte avec le nord pour trouver la direction de la Qibla
+          Tournez-vous jusqu'à ce que la flèche verte pointe vers le haut
         </Text>
       </View>
 
@@ -214,13 +235,13 @@ const QiblaScreen = () => {
           <View
             style={[
               styles.statusDot,
-              Math.abs(compassRotation) < 10 && styles.statusDotActive,
+              isPointingQibla && styles.statusDotActive,
             ]}
           />
           <Text style={styles.statusText}>
-            {Math.abs(compassRotation) < 10
-              ? 'Direction correcte!'
-              : 'Tournez votre appareil'}
+            {isPointingQibla
+              ? '✓ Vous faites face à la Mecque!'
+              : 'Tournez-vous lentement...'}
           </Text>
         </View>
       </View>
@@ -334,35 +355,15 @@ const styles = StyleSheet.create({
   westMark: {
     left: 20,
   },
-  needle: {
+  topMarker: {
     position: 'absolute',
-    width: 8,
-    height: width * 0.6,
+    top: 10,
+    zIndex: 10,
+  },
+  qiblaArrow: {
+    position: 'absolute',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  needleTop: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 15,
-    borderRightWidth: 15,
-    borderBottomWidth: 100,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#1a936f',
-  },
-  needleBottom: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 15,
-    borderRightWidth: 15,
-    borderTopWidth: 100,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#e74c3c',
   },
   centerDot: {
     position: 'absolute',
@@ -374,6 +375,7 @@ const styles = StyleSheet.create({
   },
   kaabaIcon: {
     position: 'absolute',
+    top: width * 0.15,
   },
   kaaba: {
     alignItems: 'center',
