@@ -150,20 +150,29 @@ Une fois l'application chargée, testez chaque fonctionnalité :
 - Deux cartes d'information en haut :
   - Direction en degrés (ex: 118°)
   - Distance de la Mecque en km
-- Grande boussole circulaire avec :
-  - Points cardinaux (N, E, S, O)
-  - Flèche verte pointant vers la Qibla
-  - Flèche rouge pointant vers l'opposé
-  - Icône de la Kaaba
+- Marqueur vert fixe en haut (triangle pointant vers le bas)
+- Grande boussole circulaire qui tourne avec :
+  - Points cardinaux (N, E, S, O) qui tournent
+  - Grande flèche verte (Qibla) qui pointe vers la Mecque
+  - Icône de la Kaaba sur la flèche
 - Indicateur de statut en bas
+
+**Comment ça fonctionne :**
+- La boussole (N/E/S/O) **tourne** quand vous tournez le téléphone
+- La flèche verte **pointe toujours vers la Mecque**
+- Le marqueur vert en haut est **fixe** (ne bouge pas)
+- Quand la flèche verte est alignée avec le marqueur du haut → vous faites face à la Mecque !
 
 **Tests à effectuer :**
 
 1. **Autoriser la localisation** quand demandé (obligatoire)
-2. Tenez votre téléphone **à plat** (parallèle au sol)
-3. **Tournez-vous lentement** dans différentes directions
-4. Observez la flèche verte et l'icône Kaaba tourner en temps réel
-5. Quand la flèche pointe vers le haut et que vous voyez **"Direction correcte!"**, vous êtes face à la Mecque
+2. Tenez votre téléphone **verticalement** devant vous (comme pour prendre une photo)
+3. **Tournez-vous lentement** sur vous-même (360°)
+4. Observez :
+   - Les points cardinaux (N/E/S/O) tourner avec vous
+   - La flèche verte pointer constamment vers la direction de la Mecque
+5. Continuez à tourner jusqu'à ce que la **flèche verte pointe vers le haut**
+6. Quand vous voyez **"✓ Vous faites face à la Mecque!"**, vous êtes dans la bonne direction !
 
 **Calibration du magnétomètre (si la boussole est imprécise) :**
 1. Dessinez un "8" dans l'air avec votre téléphone
@@ -182,6 +191,7 @@ Une fois l'application chargée, testez chaque fonctionnalité :
 
 **Ce que vous devez voir :**
 - En-tête vert avec texte arabe et français
+- Barre de recherche (nouvelle fonctionnalité !)
 - Liste de sourates avec :
   - Numéro
   - Nom en français et arabe
@@ -190,13 +200,21 @@ Une fois l'application chargée, testez chaque fonctionnalité :
 
 **Tests à effectuer :**
 
-1. Faites défiler la liste des sourates
-2. Appuyez sur **Al-Fatiha (1)** :
+1. **Test de la recherche :**
+   - Tapez "fatiha" dans la barre de recherche → trouve Al-Fatiha
+   - Tapez "112" → trouve Al-Ikhlas
+   - Tapez "الفاتحة" (en arabe) → trouve Al-Fatiha
+   - Tapez "nas" → trouve An-Nas
+   - Observez le compteur de résultats ("X sourates trouvées")
+   - Cliquez sur le "X" pour effacer et voir toutes les sourates
+
+2. **Lecture d'une sourate :**
+   - Appuyez sur **Al-Fatiha (1)** :
    - Un modal plein écran s'ouvre
    - Vous voyez les 7 versets en arabe
    - Chaque verset est numéroté
-3. Faites défiler pour lire tous les versets
-4. Appuyez sur la **flèche retour** en haut à gauche pour fermer
+   - Faites défiler pour lire tous les versets
+   - Appuyez sur la **flèche retour** en haut à gauche pour fermer
 
 **Sourates complètes disponibles :**
 - ✅ Al-Fatiha (1) - 7 versets
@@ -275,12 +293,18 @@ Utilisez cette checklist pour vérifier toutes les fonctionnalités :
 
 ### Qibla
 - [ ] Permission localisation accordée
-- [ ] Boussole réagit aux mouvements
-- [ ] Direction et distance affichées
-- [ ] Indicateur "Direction correcte" fonctionne
+- [ ] Boussole tourne quand vous tournez le téléphone
+- [ ] Points cardinaux (N/E/S/O) tournent correctement
+- [ ] Flèche verte pointe vers la direction de la Mecque
+- [ ] Direction et distance affichées dans les cartes du haut
+- [ ] Message "✓ Vous faites face à la Mecque!" s'affiche quand aligné
 
 ### Coran
 - [ ] Liste des sourates affichée
+- [ ] Barre de recherche fonctionne
+- [ ] Recherche par nom (français, arabe, anglais)
+- [ ] Recherche par numéro
+- [ ] Bouton "X" pour effacer la recherche
 - [ ] Ouverture d'Al-Fatiha (1)
 - [ ] Lecture des versets en arabe
 - [ ] Fermeture du modal
@@ -417,9 +441,11 @@ Dans le terminal, appuyez sur :
 
 ### Qibla
 - 2 cartes d'info (direction, distance)
-- Grande boussole ronde avec N/E/S/O
-- Flèche verte et icône Kaaba au centre
-- Badge de statut en bas
+- Marqueur vert fixe en haut (triangle)
+- Grande boussole ronde qui tourne avec N/E/S/O
+- Flèche verte (Qibla) pointant vers la Mecque
+- Icône Kaaba sur la flèche
+- Badge de statut en bas ("Vous faites face à la Mecque!" quand aligné)
 
 ### Coran
 - Liste avec numéros verts et noms arabes
