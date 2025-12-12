@@ -8,12 +8,15 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PrayerTime } from '../types';
+import { PrayerTime, PrayerTimesDatabase } from '../types';
 
 const ScannerScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
@@ -21,7 +24,22 @@ const ScannerScreen = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedTimes, setExtractedTimes] = useState<PrayerTime[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [showDateModal, setShowDateModal] = useState(false);
   const cameraRef = useRef<any>(null);
+
+  // Format date as YYYY-MM-DD
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get today's date by default
+  const getTodayDate = (): string => {
+    return formatDate(new Date());
+  };
 
   const requestCameraPermission = async () => {
     const { status } = await requestPermission();
@@ -67,6 +85,48 @@ const ScannerScreen = () => {
     }
   };
 
+  const pickPDF = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        // For PDF, we don't show preview but go straight to processing
+        processPDF(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking PDF:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner le PDF');
+    }
+  };
+
+  const processPDF = async (pdfUri: string) => {
+    setIsProcessing(true);
+    setCapturedImage(null); // No image preview for PDF
+
+    // Simulate OCR processing for PDF
+    // In a real app, you would use PDF.js + OCR or a PDF OCR service
+    setTimeout(() => {
+      // Mock extracted prayer times for whole month
+      const mockTimes: PrayerTime[] = [
+        { name: 'Fajr', time: '05:30', arabicName: 'الفجر' },
+        { name: 'Dhuhr', time: '13:45', arabicName: 'الظهر' },
+        { name: 'Asr', time: '16:30', arabicName: 'العصر' },
+        { name: 'Maghrib', time: '19:15', arabicName: 'المغرب' },
+        { name: 'Isha', time: '21:00', arabicName: 'العشاء' },
+      ];
+
+      setExtractedTimes(mockTimes);
+      setIsProcessing(false);
+
+      // Show date selection modal
+      setSelectedDate(getTodayDate());
+      setShowDateModal(true);
+    }, 2000);
+  };
+
   const processImage = async (imageUri: string) => {
     setIsProcessing(true);
 
@@ -85,32 +145,41 @@ const ScannerScreen = () => {
       setExtractedTimes(mockTimes);
       setIsProcessing(false);
 
-      Alert.alert(
-        'Scan réussi!',
-        'Les horaires de prière ont été extraits. Voulez-vous les enregistrer?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Enregistrer',
-            onPress: () => savePrayerTimes(mockTimes),
-          },
-        ]
-      );
+      // Show date selection modal
+      setSelectedDate(getTodayDate());
+      setShowDateModal(true);
     }, 2000);
   };
 
-  const savePrayerTimes = async (times: PrayerTime[]) => {
+  const savePrayerTimes = async (times: PrayerTime[], date: string) => {
     try {
-      await AsyncStorage.setItem('prayerTimes', JSON.stringify(times));
+      // Load existing database
+      const existingData = await AsyncStorage.getItem('prayerTimesDatabase');
+      let database: PrayerTimesDatabase = existingData
+        ? JSON.parse(existingData)
+        : {};
+
+      // Add or update prayer times for the specified date
+      database[date] = times;
+
+      // Save back to storage
+      await AsyncStorage.setItem('prayerTimesDatabase', JSON.stringify(database));
+
       Alert.alert(
         'Succès',
-        'Les horaires de prière ont été enregistrés. Consultez l\'onglet Accueil pour les voir.'
+        `Les horaires de prière du ${formatDateDisplay(date)} ont été enregistrés. Consultez l'onglet Accueil pour les voir.`
       );
+      setShowDateModal(false);
       resetScanner();
     } catch (error) {
       console.error('Error saving prayer times:', error);
       Alert.alert('Erreur', 'Impossible d\'enregistrer les horaires');
     }
+  };
+
+  const formatDateDisplay = (dateStr: string): string => {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   const resetScanner = () => {
@@ -176,7 +245,21 @@ const ScannerScreen = () => {
           <Ionicons name="images" size={32} color="#fff" />
           <Text style={styles.actionButtonText}>Choisir une image</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButtonAlt} onPress={pickPDF}>
+          <Ionicons name="document-text" size={32} color="#1a936f" />
+          <Text style={styles.actionButtonTextAlt}>Choisir un PDF</Text>
+        </TouchableOpacity>
       </View>
+
+      {isProcessing && !capturedImage && (
+        <View style={styles.processingContainer}>
+          <ActivityIndicator size="large" color="#1a936f" />
+          <Text style={styles.processingText}>
+            Extraction des horaires du PDF en cours...
+          </Text>
+        </View>
+      )}
 
       {capturedImage && (
         <View style={styles.previewContainer}>
@@ -206,7 +289,10 @@ const ScannerScreen = () => {
           <View style={styles.resultActions}>
             <TouchableOpacity
               style={styles.saveButton}
-              onPress={() => savePrayerTimes(extractedTimes)}
+              onPress={() => {
+                setSelectedDate(getTodayDate());
+                setShowDateModal(true);
+              }}
             >
               <Ionicons name="checkmark-circle" size={24} color="#fff" />
               <Text style={styles.saveButtonText}>Enregistrer</Text>
@@ -233,7 +319,73 @@ const ScannerScreen = () => {
           <Ionicons name="hand-left" size={20} color="#1a936f" />
           <Text style={styles.tipText}>Maintenez l'appareil stable</Text>
         </View>
+        <View style={styles.tip}>
+          <Ionicons name="document-text" size={20} color="#1a936f" />
+          <Text style={styles.tipText}>Vous pouvez aussi scanner un PDF de calendrier</Text>
+        </View>
       </View>
+
+      {/* Date Selection Modal */}
+      <Modal
+        visible={showDateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Sélectionnez la date</Text>
+            <Text style={styles.modalSubtitle}>
+              Pour quelle date sont ces horaires de prière ?
+            </Text>
+
+            <View style={styles.dateInputContainer}>
+              <Ionicons name="calendar" size={24} color="#1a936f" />
+              <TextInput
+                style={styles.dateInput}
+                value={selectedDate}
+                onChangeText={setSelectedDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <View style={styles.quickDateButtons}>
+              <TouchableOpacity
+                style={styles.quickDateButton}
+                onPress={() => setSelectedDate(getTodayDate())}
+              >
+                <Text style={styles.quickDateButtonText}>Aujourd'hui</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickDateButton}
+                onPress={() => {
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  setSelectedDate(formatDate(tomorrow));
+                }}
+              >
+                <Text style={styles.quickDateButtonText}>Demain</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowDateModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={() => savePrayerTimes(extractedTimes, selectedDate)}
+              >
+                <Text style={styles.modalSaveText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -279,6 +431,115 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  actionButtonAlt: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#1a936f',
+  },
+  actionButtonTextAlt: {
+    color: '#1a936f',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  processingContainer: {
+    backgroundColor: '#fff',
+    padding: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  dateInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  quickDateButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  quickDateButton: {
+    flex: 1,
+    backgroundColor: '#e8f5f1',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  quickDateButtonText: {
+    color: '#1a936f',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalSaveButton: {
+    flex: 1,
+    backgroundColor: '#1a936f',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   camera: {

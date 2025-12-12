@@ -5,8 +5,12 @@ export interface PrayerTime {
 }
 
 export interface DailyPrayerTimes {
-  date: Date;
+  date: string; // Format: YYYY-MM-DD
   prayers: PrayerTime[];
+}
+
+export interface PrayerTimesDatabase {
+  [dateKey: string]: PrayerTime[]; // Key: YYYY-MM-DD, Value: array of prayer times
 }
 
 export interface Location {

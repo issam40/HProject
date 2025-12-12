@@ -38,12 +38,28 @@ const HomeScreen = () => {
 
   const loadPrayerTimes = async () => {
     try {
-      // Try to load from storage first (from scanner)
+      // Format today's date as YYYY-MM-DD
+      const today = new Date();
+      const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      // Try to load from database (from scanner)
+      const databaseData = await AsyncStorage.getItem('prayerTimesDatabase');
+      if (databaseData) {
+        const database = JSON.parse(databaseData);
+
+        // Check if we have prayer times for today
+        if (database[dateKey]) {
+          setPrayerTimes(database[dateKey]);
+          console.log(`Loaded prayer times for ${dateKey}`);
+          return;
+        }
+      }
+
+      // Fallback: try old storage format for backwards compatibility
       const storedTimes = await AsyncStorage.getItem('prayerTimes');
       if (storedTimes) {
         const times = JSON.parse(storedTimes);
         setPrayerTimes(times);
-        // updateNextPrayer will be called automatically by useEffect when prayerTimes updates
       } else {
         // Default prayer times (example for Paris)
         setDefaultPrayerTimes();
