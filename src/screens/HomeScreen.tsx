@@ -23,11 +23,18 @@ const HomeScreen = () => {
   useEffect(() => {
     loadPrayerTimes();
     getLocation();
-    const interval = setInterval(() => {
-      updateNextPrayer();
-    }, 60000); // Update every minute
-    return () => clearInterval(interval);
   }, []);
+
+  // Update next prayer whenever prayerTimes changes or every minute
+  useEffect(() => {
+    if (prayerTimes.length > 0) {
+      updateNextPrayer();
+      const interval = setInterval(() => {
+        updateNextPrayer();
+      }, 60000); // Update every minute
+      return () => clearInterval(interval);
+    }
+  }, [prayerTimes]);
 
   const loadPrayerTimes = async () => {
     try {
@@ -36,7 +43,7 @@ const HomeScreen = () => {
       if (storedTimes) {
         const times = JSON.parse(storedTimes);
         setPrayerTimes(times);
-        updateNextPrayer();
+        // updateNextPrayer will be called automatically by useEffect when prayerTimes updates
       } else {
         // Default prayer times (example for Paris)
         setDefaultPrayerTimes();
@@ -56,7 +63,7 @@ const HomeScreen = () => {
       { name: 'Isha', time: '21:00', arabicName: 'العشاء' },
     ];
     setPrayerTimes(defaultTimes);
-    updateNextPrayer();
+    // updateNextPrayer will be called automatically by useEffect when prayerTimes updates
   };
 
   const getLocation = async () => {
@@ -165,6 +172,11 @@ const HomeScreen = () => {
             <View style={styles.prayerInfo}>
               <Text style={styles.prayerArabicName}>{prayer.arabicName}</Text>
               <Text style={styles.prayerName}>{prayer.name}</Text>
+              {prayer.name === nextPrayer && (
+                <View style={styles.nextBadge}>
+                  <Text style={styles.nextBadgeText}>PROCHAIN</Text>
+                </View>
+              )}
             </View>
             <Text
               style={[
@@ -292,6 +304,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+  },
+  nextBadge: {
+    backgroundColor: '#1a936f',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  nextBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   prayerTime: {
     fontSize: 18,
