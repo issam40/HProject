@@ -10,10 +10,12 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrayerTime, PrayerTimesDatabase } from '../types';
@@ -24,8 +26,11 @@ const ScannerScreen = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedTimes, setExtractedTimes] = useState<PrayerTime[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(new Date());
   const [showDateModal, setShowDateModal] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const cameraRef = useRef<any>(null);
 
   // Format date as YYYY-MM-DD
@@ -36,9 +41,19 @@ const ScannerScreen = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // Get today's date by default
-  const getTodayDate = (): string => {
-    return formatDate(new Date());
+  // Format date for display (DD/MM/YYYY)
+  const formatDateDisplay = (date: Date): string => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Get number of days between two dates
+  const getDaysBetween = (start: Date, end: Date): number => {
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays + 1; // Include both start and end dates
   };
 
   const requestCameraPermission = async () => {
@@ -121,8 +136,10 @@ const ScannerScreen = () => {
       setExtractedTimes(mockTimes);
       setIsProcessing(false);
 
-      // Show date selection modal
-      setSelectedDate(getTodayDate());
+      // Show date selection modal with today's date
+      const today = new Date();
+      setStartDate(today);
+      setEndDate(today);
       setShowDateModal(true);
     }, 2000);
   };
@@ -145,41 +162,54 @@ const ScannerScreen = () => {
       setExtractedTimes(mockTimes);
       setIsProcessing(false);
 
-      // Show date selection modal
-      setSelectedDate(getTodayDate());
+      // Show date selection modal with today's date
+      const today = new Date();
+      setStartDate(today);
+      setEndDate(today);
       setShowDateModal(true);
     }, 2000);
   };
 
-  const savePrayerTimes = async (times: PrayerTime[], date: string) => {
+  const savePrayerTimes = async (times: PrayerTime[], start: Date, end: Date) => {
     try {
+      // Validate dates
+      if (start > end) {
+        Alert.alert('Erreur', 'La date de début doit être avant la date de fin');
+        return;
+      }
+
       // Load existing database
       const existingData = await AsyncStorage.getItem('prayerTimesDatabase');
       let database: PrayerTimesDatabase = existingData
         ? JSON.parse(existingData)
         : {};
 
-      // Add or update prayer times for the specified date
-      database[date] = times;
+      // Save prayer times for each day in the range
+      const currentDate = new Date(start);
+      let savedCount = 0;
+
+      while (currentDate <= end) {
+        const dateKey = formatDate(currentDate);
+        database[dateKey] = times;
+        savedCount++;
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
 
       // Save back to storage
       await AsyncStorage.setItem('prayerTimesDatabase', JSON.stringify(database));
 
-      Alert.alert(
-        'Succès',
-        `Les horaires de prière du ${formatDateDisplay(date)} ont été enregistrés. Consultez l'onglet Accueil pour les voir.`
-      );
+      const dayCount = getDaysBetween(start, end);
+      const message = dayCount === 1
+        ? `Les horaires de prière du ${formatDateDisplay(start)} ont été enregistrés.`
+        : `Les horaires de prière du ${formatDateDisplay(start)} au ${formatDateDisplay(end)} (${dayCount} jours) ont été enregistrés.`;
+
+      Alert.alert('Succès', message + '\n\nConsultez l\'onglet Accueil pour les voir.');
       setShowDateModal(false);
       resetScanner();
     } catch (error) {
       console.error('Error saving prayer times:', error);
       Alert.alert('Erreur', 'Impossible d\'enregistrer les horaires');
     }
-  };
-
-  const formatDateDisplay = (dateStr: string): string => {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
   };
 
   const resetScanner = () => {
@@ -290,12 +320,14 @@ const ScannerScreen = () => {
             <TouchableOpacity
               style={styles.saveButton}
               onPress={() => {
-                setSelectedDate(getTodayDate());
+                const today = new Date();
+                setStartDate(today);
+                setEndDate(today);
                 setShowDateModal(true);
               }}
             >
-              <Ionicons name="checkmark-circle" size={24} color="#fff" />
-              <Text style={styles.saveButtonText}>Enregistrer</Text>
+              <Ionicons name="calendar" size={24} color="#fff" />
+              <Text style={styles.saveButtonText}>Choisir les dates</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.retryButton} onPress={resetScanner}>
               <Ionicons name="refresh" size={24} color="#1a936f" />
@@ -334,41 +366,92 @@ const ScannerScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Sélectionnez la date</Text>
+            <View style={styles.modalHeader}>
+              <Ionicons name="calendar" size={32} color="#1a936f" />
+              <Text style={styles.modalTitle}>Sélectionnez les dates</Text>
+            </View>
             <Text style={styles.modalSubtitle}>
-              Pour quelle date sont ces horaires de prière ?
+              Pour quelle(s) date(s) sont ces horaires de prière ?
             </Text>
 
-            <View style={styles.dateInputContainer}>
-              <Ionicons name="calendar" size={24} color="#1a936f" />
-              <TextInput
-                style={styles.dateInput}
-                value={selectedDate}
-                onChangeText={setSelectedDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#999"
-              />
+            {/* Start Date */}
+            <View style={styles.dateSection}>
+              <Text style={styles.dateLabel}>📅 Date de début</Text>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color="#1a936f" />
+                <Text style={styles.datePickerButtonText}>
+                  {formatDateDisplay(startDate)}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
             </View>
 
+            {/* End Date */}
+            <View style={styles.dateSection}>
+              <Text style={styles.dateLabel}>📅 Date de fin</Text>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color="#1a936f" />
+                <Text style={styles.datePickerButtonText}>
+                  {formatDateDisplay(endDate)}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Days count */}
+            {getDaysBetween(startDate, endDate) > 1 && (
+              <View style={styles.daysCountContainer}>
+                <Ionicons name="time" size={16} color="#1a936f" />
+                <Text style={styles.daysCountText}>
+                  {getDaysBetween(startDate, endDate)} jours sélectionnés
+                </Text>
+              </View>
+            )}
+
+            {/* Quick selection buttons */}
             <View style={styles.quickDateButtons}>
               <TouchableOpacity
                 style={styles.quickDateButton}
-                onPress={() => setSelectedDate(getTodayDate())}
+                onPress={() => {
+                  const today = new Date();
+                  setStartDate(today);
+                  setEndDate(today);
+                }}
               >
                 <Text style={styles.quickDateButtonText}>Aujourd'hui</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.quickDateButton}
                 onPress={() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  setSelectedDate(formatDate(tomorrow));
+                  const today = new Date();
+                  const nextWeek = new Date(today);
+                  nextWeek.setDate(nextWeek.getDate() + 6);
+                  setStartDate(today);
+                  setEndDate(nextWeek);
                 }}
               >
-                <Text style={styles.quickDateButtonText}>Demain</Text>
+                <Text style={styles.quickDateButtonText}>Cette semaine</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickDateButton}
+                onPress={() => {
+                  const today = new Date();
+                  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                  setStartDate(today);
+                  setEndDate(endOfMonth);
+                }}
+              >
+                <Text style={styles.quickDateButtonText}>Ce mois</Text>
               </TouchableOpacity>
             </View>
 
+            {/* Action buttons */}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
@@ -378,14 +461,49 @@ const ScannerScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalSaveButton}
-                onPress={() => savePrayerTimes(extractedTimes, selectedDate)}
+                onPress={() => savePrayerTimes(extractedTimes, startDate, endDate)}
               >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 <Text style={styles.modalSaveText}>Enregistrer</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Date Pickers */}
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={startDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, selectedDate) => {
+            setShowStartDatePicker(false);
+            if (selectedDate) {
+              setStartDate(selectedDate);
+              // If start date is after end date, update end date
+              if (selectedDate > endDate) {
+                setEndDate(selectedDate);
+              }
+            }
+          }}
+        />
+      )}
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={endDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          minimumDate={startDate}
+          onChange={(event, selectedDate) => {
+            setShowEndDatePicker(false);
+            if (selectedDate) {
+              setEndDate(selectedDate);
+            }
+          }}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -470,18 +588,62 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 14,
     color: '#666',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  dateSection: {
+    marginBottom: 16,
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    gap: 10,
+  },
+  datePickerButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  daysCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5f1',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  daysCountText: {
+    fontSize: 14,
+    color: '#1a936f',
+    fontWeight: '600',
   },
   dateInputContainer: {
     flexDirection: 'row',
@@ -533,9 +695,12 @@ const styles = StyleSheet.create({
   modalSaveButton: {
     flex: 1,
     backgroundColor: '#1a936f',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 14,
     borderRadius: 8,
-    alignItems: 'center',
+    gap: 8,
   },
   modalSaveText: {
     color: '#fff',
