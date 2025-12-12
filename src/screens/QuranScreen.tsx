@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -125,6 +126,29 @@ const SAMPLE_AYAHS: { [key: number]: string[] } = {
 const QuranScreen = () => {
   const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredSurahs, setFilteredSurahs] = useState<Surah[]>(SURAHS);
+
+  useEffect(() => {
+    filterSurahs();
+  }, [searchQuery]);
+
+  const filterSurahs = () => {
+    if (searchQuery.trim() === '') {
+      setFilteredSurahs(SURAHS);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = SURAHS.filter(
+      (surah) =>
+        surah.name.toLowerCase().includes(query) ||
+        surah.arabicName.includes(searchQuery) ||
+        surah.englishName.toLowerCase().includes(query) ||
+        surah.number.toString() === searchQuery
+    );
+    setFilteredSurahs(filtered);
+  };
 
   const openSurah = (surah: Surah) => {
     setSelectedSurah(surah);
@@ -158,11 +182,46 @@ const QuranScreen = () => {
         <Text style={styles.headerSubtitle}>Le Saint Coran</Text>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#999" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Rechercher une sourate (nom, numéro)..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#999" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Results Count */}
+      {searchQuery.length > 0 && (
+        <View style={styles.resultsContainer}>
+          <Text style={styles.resultsText}>
+            {filteredSurahs.length} sourate{filteredSurahs.length > 1 ? 's' : ''}{' '}
+            trouvée{filteredSurahs.length > 1 ? 's' : ''}
+          </Text>
+        </View>
+      )}
+
       <FlatList
-        data={SURAHS}
+        data={filteredSurahs}
         renderItem={renderSurah}
         keyExtractor={(item) => item.number.toString()}
         contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>Aucune sourate trouvée</Text>
+            <Text style={styles.emptySubtext}>
+              Essayez de modifier votre recherche
+            </Text>
+          </View>
+        }
       />
 
       {/* Surah Reader Modal */}
@@ -231,8 +290,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     opacity: 0.9,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+  resultsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  resultsText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   listContainer: {
     padding: 16,
+    paddingTop: 0,
   },
   surahCard: {
     backgroundColor: '#fff',
